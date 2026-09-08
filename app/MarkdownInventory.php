@@ -23,7 +23,7 @@ class MarkdownInventory
     public function render(string $markdown, Collection $disks): string
     {
         $front = $disks->where('location_type', 'front')->keyBy('location');
-        $storageRows = collect(range(1, 24))->map(function (int $slot) use ($front): string {
+        $storageRows = collect(range(1, config('disk.shelf.slots')))->map(function (int $slot) use ($front): string {
             $disk = $front->get((string) $slot);
 
             return $this->row([

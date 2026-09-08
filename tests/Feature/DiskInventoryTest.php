@@ -244,6 +244,36 @@ class DiskInventoryTest extends TestCase
             ->assertSee('FAULTED');
     }
 
+    public function test_shelf_configuration_controls_the_front_enclosure_layout(): void
+    {
+        config()->set('disk.shelf', [
+            'rows' => 2,
+            'columns' => 3,
+            'slots' => 6,
+            'auto_fit' => true,
+        ]);
+
+        $this->get(route('disks.index'))
+            ->assertSee('Front enclosure · 2 × 3')
+            ->assertSee('Bays 01–06')
+            ->assertSee('class="shelf auto-fit"', false)
+            ->assertSee('style="--shelf-columns: 3"', false)
+            ->assertSee('slot=6', false)
+            ->assertDontSee('slot=7', false);
+    }
+
+    public function test_front_disk_location_must_fit_the_configured_shelf(): void
+    {
+        config()->set('disk.shelf.slots', 6);
+
+        $this->from(route('disks.create'))
+            ->post(route('disks.store'), [...$this->diskData(), 'location' => '7'])
+            ->assertRedirect(route('disks.create'))
+            ->assertSessionHasErrors('location');
+
+        $this->assertDatabaseMissing('disks', ['serial' => 'NEW-SERIAL']);
+    }
+
     public function test_disk_status_must_be_valid(): void
     {
         $this->from(route('disks.create'))

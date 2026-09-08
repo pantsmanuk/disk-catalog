@@ -13,7 +13,7 @@
         </select>
     </label>
     <label>Slot or location
-        <input name="location" value="{{ old('location', $disk->location ?: request('slot')) }}" maxlength="40" placeholder="1–24, Upper, Lower…" required>
+        <input name="location" value="{{ old('location', $disk->location ?: request('slot')) }}" maxlength="40" placeholder="1–{{ config('disk.shelf.slots') }}, Upper, Lower…" required>
     </label>
     <label>Interface
         <select name="interface" required>

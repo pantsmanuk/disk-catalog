@@ -10,7 +10,7 @@
 <body>
     <header class="topbar">
         <a class="brand" href="{{ route('disks.index') }}">
-            <span class="brand-mark">24</span>
+            <span class="brand-mark">{{ config('disk.shelf.slots') }}</span>
             <span><strong>{{ config('app.name') }}</strong><small>physical disk catalogue</small></span>
         </a>
         <nav aria-label="Inventory actions">
