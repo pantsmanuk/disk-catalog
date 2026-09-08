@@ -7,6 +7,7 @@ use App\MarkdownInventory;
 use App\Models\Disk;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class DatabaseSeeder extends Seeder
@@ -23,11 +24,13 @@ class DatabaseSeeder extends Seeder
             ? $storage->get('storage-audit.md')
             : file_get_contents(resource_path('storage-audit.example.md'));
 
-        foreach (app(MarkdownInventory::class)->parse($markdown) as $disk) {
-            $disk['status'] = collect(DiskStatus::cases())->first(
-                fn (DiskStatus $status): bool => str_starts_with(strtoupper($disk['notes']), strtoupper($status->label())),
-            ) ?? DiskStatus::Active;
-            Disk::query()->updateOrCreate(['serial' => $disk['serial']], $disk);
-        }
+        DB::transaction(function () use ($markdown): void {
+            foreach (app(MarkdownInventory::class)->parse($markdown) as $disk) {
+                $disk['status'] = collect(DiskStatus::cases())->first(
+                    fn (DiskStatus $status): bool => str_starts_with(strtoupper($disk['notes']), strtoupper($status->label())),
+                ) ?? DiskStatus::Active;
+                Disk::query()->updateOrCreate(['serial' => $disk['serial']], $disk);
+            }
+        });
     }
 }
