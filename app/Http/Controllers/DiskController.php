@@ -96,7 +96,7 @@ class DiskController extends Controller
                 'required',
                 'string',
                 'max:40',
-                Rule::when($locationType === 'front', Rule::in(array_map('strval', range(1, 24)))),
+                Rule::when($locationType === 'front', Rule::in(array_map('strval', range(1, config('disk.shelf.slots'))))),
                 Rule::unique('disks')->where('location_type', $locationType)->ignore($disk),
             ],
             'gptid' => ['nullable', 'string', 'ascii', 'max:100', Rule::unique('disks')->ignore($disk)],
