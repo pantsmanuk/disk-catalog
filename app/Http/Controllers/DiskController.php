@@ -79,6 +79,15 @@ class DiskController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request, ?Disk $disk = null): array
     {
+        foreach (['gptid', 'device'] as $identifier) {
+            if (is_string($request->input($identifier))) {
+                $value = trim($request->input($identifier));
+                $request->merge([
+                    $identifier => mb_check_encoding($value, 'ASCII') ? Disk::normalizeIdentifier($value) : $value,
+                ]);
+            }
+        }
+
         $locationType = $request->string('location_type')->value();
 
         return $request->validate([
@@ -90,8 +99,8 @@ class DiskController extends Controller
                 Rule::when($locationType === 'front', Rule::in(array_map('strval', range(1, 24)))),
                 Rule::unique('disks')->where('location_type', $locationType)->ignore($disk),
             ],
-            'gptid' => ['nullable', 'string', 'max:100'],
-            'device' => ['nullable', 'string', 'max:40'],
+            'gptid' => ['nullable', 'string', 'ascii', 'max:100', Rule::unique('disks')->ignore($disk)],
+            'device' => ['nullable', 'string', 'ascii', 'max:40', Rule::unique('disks')->ignore($disk)],
             'serial' => ['required', 'string', 'max:100', Rule::unique('disks')->ignore($disk)],
             'model' => ['required', 'string', 'max:100'],
             'capacity' => ['nullable', 'string', 'max:40'],

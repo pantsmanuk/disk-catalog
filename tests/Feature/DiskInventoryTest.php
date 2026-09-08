@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\DiskStatus;
 use App\Models\Disk;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class DiskInventoryTest extends TestCase
@@ -63,6 +66,141 @@ class DiskInventoryTest extends TestCase
         $this->assertDatabaseMissing('disks', ['serial' => 'NEW-SERIAL']);
     }
 
+    public function test_duplicate_device_and_gptid_are_rejected_when_creating(): void
+    {
+        Disk::query()->create([
+            ...$this->diskData(),
+            'location' => '1',
+            'serial' => 'EXISTING-SERIAL',
+        ]);
+
+        $this->from(route('disks.create'))
+            ->post(route('disks.store'), [
+                ...$this->diskData(),
+                'location' => '2',
+                'serial' => 'DUPLICATE-IDENTIFIERS',
+                'device' => ' DA24 ',
+                'gptid' => 'TEST-GPTID',
+            ])
+            ->assertRedirect(route('disks.create'))
+            ->assertSessionHasErrors(['device', 'gptid']);
+
+        $this->assertDatabaseMissing('disks', ['serial' => 'DUPLICATE-IDENTIFIERS']);
+    }
+
+    public function test_duplicate_device_and_gptid_are_rejected_when_updating(): void
+    {
+        Disk::query()->create([
+            ...$this->diskData(),
+            'location' => '1',
+            'serial' => 'FIRST-SERIAL',
+            'device' => 'da1',
+            'gptid' => 'first-gptid',
+        ]);
+        $disk = Disk::query()->create([
+            ...$this->diskData(),
+            'location' => '2',
+            'serial' => 'SECOND-SERIAL',
+            'device' => 'da2',
+            'gptid' => 'second-gptid',
+        ]);
+
+        $this->from(route('disks.edit', $disk))
+            ->put(route('disks.update', $disk), [
+                ...$this->diskData(),
+                'location' => '2',
+                'serial' => 'SECOND-SERIAL',
+                'device' => 'DA1',
+                'gptid' => ' FIRST-GPTID ',
+            ])
+            ->assertRedirect(route('disks.edit', $disk))
+            ->assertSessionHasErrors(['device', 'gptid']);
+
+        $this->assertDatabaseHas('disks', [
+            'id' => $disk->id,
+            'device' => 'da2',
+            'gptid' => 'second-gptid',
+        ]);
+    }
+
+    public function test_multiple_disks_may_have_blank_device_and_gptid(): void
+    {
+        foreach ([1, 2] as $slot) {
+            $this->post(route('disks.store'), [
+                ...$this->diskData(),
+                'location' => (string) $slot,
+                'serial' => "BLANK-IDENTIFIERS-{$slot}",
+                'device' => ' ',
+                'gptid' => '',
+            ])->assertRedirect();
+        }
+
+        $this->assertSame(2, Disk::query()->whereNull('device')->whereNull('gptid')->count());
+    }
+
+    public function test_device_and_gptid_must_be_ascii(): void
+    {
+        $this->from(route('disks.create'))
+            ->post(route('disks.store'), [
+                ...$this->diskData(),
+                'device' => 'dä1',
+                'gptid' => 'gptïd',
+            ])
+            ->assertRedirect(route('disks.create'))
+            ->assertSessionHasErrors(['device', 'gptid']);
+
+        $this->assertDatabaseMissing('disks', ['serial' => 'NEW-SERIAL']);
+    }
+
+    /** @param 'device'|'gptid' $identifier */
+    #[DataProvider('uniqueIdentifierProvider')]
+    public function test_database_rejects_duplicate_identifiers(string $identifier): void
+    {
+        $firstDisk = [
+            ...$this->diskData(),
+            'location' => '1',
+            'serial' => 'FIRST-SERIAL',
+            'device' => 'da1',
+            'gptid' => 'first-gptid',
+        ];
+        DB::table('disks')->insert($firstDisk);
+
+        $this->expectException(QueryException::class);
+
+        DB::table('disks')->insert([
+            ...$this->diskData(),
+            'location' => '2',
+            'serial' => 'SECOND-SERIAL',
+            'device' => 'da2',
+            'gptid' => 'second-gptid',
+            $identifier => strtoupper($firstDisk[$identifier]),
+        ]);
+    }
+
+    public static function uniqueIdentifierProvider(): array
+    {
+        return [
+            'device' => ['device'],
+            'gptid' => ['gptid'],
+        ];
+    }
+
+    public function test_duplicate_import_rolls_back_all_disk_changes(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put(
+            'storage-audit.md',
+            str_replace('example-gptid-002', 'example-gptid-001', file_get_contents(resource_path('storage-audit.example.md'))),
+        );
+
+        try {
+            $this->seed();
+            $this->fail('Expected duplicate GPTID to fail import.');
+        } catch (QueryException) {
+            $this->assertDatabaseCount('disks', 0);
+        }
+    }
+
     public function test_export_replaces_inventory_and_preserves_rest_of_audit(): void
     {
         Storage::fake('local');
@@ -89,6 +227,8 @@ class DiskInventoryTest extends TestCase
                 ...$this->diskData(),
                 'location' => (string) ($index + 1),
                 'serial' => 'STATUS-'.$status->value,
+                'device' => 'status-device-'.$index,
+                'gptid' => 'status-gptid-'.$index,
                 'status' => $status,
             ]);
         }
