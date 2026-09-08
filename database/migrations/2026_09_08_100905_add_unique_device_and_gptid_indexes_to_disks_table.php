@@ -54,9 +54,23 @@ return new class extends Migration
             return;
         }
 
+        if (DB::getDriverName() === 'sqlsrv') {
+            Schema::table('disks', function (Blueprint $table) {
+                $table->computed('device_normalized', 'LOWER(device)')->persisted();
+                $table->computed('gptid_normalized', 'LOWER(gptid)')->persisted();
+            });
+
+            DB::statement('CREATE UNIQUE INDEX disks_device_unique ON disks (device_normalized) WHERE device_normalized IS NOT NULL');
+            DB::statement('CREATE UNIQUE INDEX disks_gptid_unique ON disks (gptid_normalized) WHERE gptid_normalized IS NOT NULL');
+
+            return;
+        }
+
         Schema::table('disks', function (Blueprint $table) {
-            $table->unique('device');
-            $table->unique('gptid');
+            $table->string('device_normalized')->nullable()->storedAs('LOWER(device)');
+            $table->string('gptid_normalized')->nullable()->storedAs('LOWER(gptid)');
+            $table->unique('device_normalized', 'disks_device_unique');
+            $table->unique('gptid_normalized', 'disks_gptid_unique');
         });
     }
 
@@ -73,8 +87,9 @@ return new class extends Migration
         }
 
         Schema::table('disks', function (Blueprint $table) {
-            $table->dropUnique(['device']);
-            $table->dropUnique(['gptid']);
+            $table->dropUnique('disks_device_unique');
+            $table->dropUnique('disks_gptid_unique');
+            $table->dropColumn(['device_normalized', 'gptid_normalized']);
         });
     }
 
