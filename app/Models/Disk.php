@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
+/**
+ * @property string|null $gptid
+ * @property string|null $device
+ * @property DiskStatus $status
+ */
 class Disk extends Model
 {
     protected $fillable = [

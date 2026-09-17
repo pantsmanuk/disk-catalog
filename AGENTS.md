@@ -1,3 +1,5 @@
+Ingest `~/.agents/AGENTS.md`, then continue.
+
 <laravel-boost-guidelines>
 === foundation rules ===
 

@@ -67,7 +67,7 @@ class MarkdownInventory
 
             return [
                 'location_type' => $locationType,
-                'location' => $values[0] ?? '',
+                'location' => $values[0],
                 'gptid' => $values[1] ?? '',
                 'device' => $values[2] ?? '',
                 'serial' => $values[3] ?? '',
