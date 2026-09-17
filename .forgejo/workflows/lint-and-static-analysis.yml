@@ -1,0 +1,14 @@
+name: Lint & Static Analysis Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pint:
+    runs-on: php84
+    steps:
+      - uses: actions/checkout@v4
+      - run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+      - run: APP_ENV=local vendor/bin/phpstan analyse --memory-limit=1G
+      - run: vendor/bin/pint --test
